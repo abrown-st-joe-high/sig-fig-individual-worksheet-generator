@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Significant Figures Worksheet Generator</title>
+<style>
+:root{--ink:#1d2a33;--muted:#5b6b76;--line:#c9d3d9;--bg:#f3f6f7;--panel:#fff;--accent:#0b6e7f}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--bg);line-height:1.45}
+.controls{max-width:760px;margin:0 auto;padding:28px 20px 12px}
+.controls h1{font-size:1.5rem;margin:0 0 4px}
+.controls p{margin:0 0 16px;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+label{display:block;font-weight:600;margin-bottom:6px}
+textarea{width:100%;min-height:150px;padding:10px;font:inherit;border:1px solid var(--line);border-radius:6px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:12px}
+.row input[type=number]{width:80px;padding:6px;font:inherit;border:1px solid var(--line);border-radius:6px}
+.row label{margin:0;font-weight:500}
+button{font:inherit;font-weight:600;padding:9px 16px;border-radius:6px;border:1px solid var(--accent);cursor:pointer}
+.primary{background:var(--accent);color:#fff}
+.secondary{background:#fff;color:var(--accent)}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #f2a900;outline-offset:2px}
+#out{padding:12px 20px 40px}
+.sheet,.key{background:#fff;width:8.5in;max-width:100%;min-height:10.4in;margin:0 auto 20px;padding:.55in .65in;border:1px solid var(--line);font-family:Georgia,"Times New Roman",serif;font-size:12.5pt;color:#000}
+.sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px;gap:12px;flex-wrap:wrap}
+.sheet h1,.key h1{font-size:17pt;margin:0}
+.nm{font-size:15pt}
+.meta{font-size:11pt}
+.dir{font-size:10.5pt;margin:0 0 10px;font-style:italic}
+.q{margin:0 0 11px}
+.q h2{font-size:12pt;margin:0 0 4px}
+.items{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 14px}
+.items.two{grid-template-columns:repeat(2,1fr)}
+.it{display:flex;gap:6px;align-items:baseline}
+.ans{display:inline-block;border-bottom:1px solid #000;min-width:70px;margin-left:4px}
+.work{height:.45in}
+.chal{border:1.5px solid #000;padding:8px 12px;margin-top:6px}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:4px 0}
+.frac>span:first-child{border-bottom:1.5px solid #000;padding:0 8px 3px}
+.frac>span:last-child{padding:3px 8px 0}
+.note{font-size:10pt;margin:8px 0 0;font-style:italic}
+.keyrow{margin:0 0 6px;font-size:11pt}
+sup{font-size:.7em;line-height:0}
+@media (max-width:700px){.sheet,.key{padding:20px}.items{grid-template-columns:1fr 1fr}}
+@media print{
+  @page{size:letter;margin:.4in}
+  body{background:#fff}
+  .controls{display:none}
+  #out{padding:0}
+  .sheet,.key{border:0;margin:0;padding:.15in .25in;width:auto;min-height:0;page-break-after:always;break-after:page}
+  .sheet:last-child,.key:last-child{page-break-after:auto}
+}
+</style>
+</head>
+<body>
+<div class="controls">
+  <h1>Significant Figures Worksheet Generator</h1>
+  <p>Enter one student name per line. Each student gets their own worksheet; problems 1–3 are shared, and problems 4–7 differ by student.</p>
+  <div class="panel">
+    <label for="names">Student names</label>
+    <textarea id="names" placeholder="Ava Johnson&#10;Marcus Lee&#10;Priya Patel"></textarea>
+    <div class="row">
+      <span><label for="seed" style="display:inline">Version number</label> <input type="number" id="seed" value="1" min="1"></span>
+      <label><input type="checkbox" id="key" checked> Include answer key pages</label>
+    </div>
+    <div class="row">
+      <button class="primary" id="gen">Generate worksheets</button>
+      <button class="secondary" id="print">Print or save as PDF</button>
+    </div>
+  </div>
+</div>
+<div id="out" aria-live="polite"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Seeded random numbers: the same name + version always gives the same worksheet
+function hash(s){let h=1779033703^s.length;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=h<<13|h>>>19}return h>>>0}
+function rng(seed){let a=seed;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const ri=(r,a,b)=>a+Math.floor(r()*(b-a+1));
+const pick=(r,arr)=>arr[Math.floor(r()*arr.length)];
+const neg=e=>e<0?"\u2212"+(-e):""+e;
+
+function digits(r,sf,tz){
+  let s=""+ri(r,1,9);
+  for(let i=1;i<sf-1;i++)s+=ri(r,0,9);
+  return s+(tz?"0":ri(r,1,9));
+}
+// plain decimal number with a known number of sig figs
+function plain(r,sf,o={}){
+  const s=digits(r,sf,o.tz);let str;
+  if(o.lead){str="0."+"0".repeat(o.lead)+s}
+  else{const p=ri(r,1,sf-1);str=s.slice(0,p)+"."+s.slice(p)}
+  return{h:str,v:parseFloat(str),sf};
+}
+function sci(r,sf,tz){
+  const s=digits(r,sf,tz),m=s[0]+"."+s.slice(1),e=pick(r,[-9,-7,-5,-4,-3,2,3,4,5,6,8,12]);
+  return{h:`${m} \u00d7 10<sup>${neg(e)}</sup>`,v:parseFloat(m+"e"+e),sf};
+}
+function fmt(v,sf){
+  const s=v.toPrecision(sf);
+  if(/e/.test(s)){const[m,e]=s.split("e");return`${m} \u00d7 10<sup>${neg(+e)}</sup>`}
+  return s;
+}
+const N=(h,v,sf)=>({h,v,sf});
+
+const count=(n)=>({q:n.h,a:n.sf});
+const calc=(a,b,op)=>{
+  const sf=Math.min(a.sf,b.sf),v=op==="\u00d7"?a.v*b.v:a.v/b.v;
+  return{q:`${a.h} ${op} ${b.h} =`,a:fmt(v,sf)+` (${sf} s.f.)`};
+};
+const twoSF=(r)=>{const a=ri(r,2,4);let b;do{b=ri(r,2,4)}while(b===a);return[a,b]};
+
+const METALS=[
+ ["tungsten",183.84,2,"body-centered",3.165],["iron",55.845,2,"body-centered",2.866],
+ ["chromium",51.996,2,"body-centered",2.910],["molybdenum",95.95,2,"body-centered",3.147],
+ ["copper",63.546,4,"face-centered",3.615],["aluminum",26.982,4,"face-centered",4.050],
+ ["silver",107.87,4,"face-centered",4.086],["gold",196.97,4,"face-centered",4.078],
+ ["nickel",58.693,4,"face-centered",3.524]
+];
+
+function build(name,idx,seed){
+  const r=rng(hash(name+"|"+idx+"|"+seed));
+  const S={name};
+  // Shared problems (same for every student)
+  S.g1=[count(N("3.14",3.14,3)),count(N("0.0845",.0845,3)),count(N("2.130 \u00d7 10<sup>3</sup>",2130,4))];
+  S.g2=[calc(N("4.56",4.56,3),N("1.4",1.4,2),"\u00d7"),calc(N("12.5",12.5,3),N("0.032",.032,2),"\u00d7")];
+  S.g3=[calc(N("8.40",8.4,3),N("2.1",2.1,2),"\u00f7"),calc(N("15.75",15.75,4),N("0.250",.25,3),"\u00f7")];
+  // Individual problems
+  S.g4=[count(plain(r,ri(r,2,3),{lead:ri(r,1,3)})),count(sci(r,ri(r,3,4),true))];
+  let[x1,y1]=twoSF(r),[x2,y2]=twoSF(r);
+  S.g5=[calc(plain(r,x1),plain(r,y1),"\u00d7"),calc(plain(r,x2,{lead:1}),plain(r,y2),"\u00d7")];
+  [x1,y1]=twoSF(r);[x2,y2]=twoSF(r);
+  S.g6=[calc(plain(r,x1+0),plain(r,y1),"\u00f7"),calc(plain(r,x2),plain(r,y2,{lead:1}),"\u00f7")];
+  // Challenge: density from unit cell
+  const m=pick(r,METALS),Msf=ri(r,3,4),M=parseFloat(m[1].toPrecision(Msf)),a=parseFloat(m[4].toPrecision(3));
+  const n=m[2],nTxt=n.toFixed(1),NA=6.02e23;
+  const v=(n*M)/(NA*Math.pow(a*1e-8,3));
+  S.ch={metal:m[0],type:m[3],n:n,
+    top:`${nTxt} \u00d7 ${M} g/mol`,
+    bot:`(6.02 \u00d7 10<sup>23</sup> mol<sup>\u22121</sup>)(${a} \u00d7 10<sup>\u22128</sup> cm)<sup>3</sup>`,
+    ans:fmt(v,2)+" g/cm\u00b3 (2 s.f., limited by the atom count)"};
+  return S;
+}
+
+const items=(list,start,cls="")=>`<div class="items ${cls}">${list.map((x,i)=>`<div class="it"><span>${start}${"abc"[i]}.</span><span>${x.q}</span>${typeof x.a==="number"?'<span class="ans"></span>':""}</div>`).join("")}</div>`;
+const calcs=(list,start)=>`<div class="items two">${list.map((x,i)=>`<div><div class="it"><span>${start}${"abc"[i]}.</span><span>${x.q}</span></div><div class="work"></div><div>Answer: <span class="ans" style="min-width:120px"></span></div></div>`).join("")}</div>`;
+
+function sheet(S){
+  return`<section class="sheet">
+  <header><div><h1>Significant Figures</h1><div class="nm">Name: <b>${esc(S.name)}</b></div></div><div class="meta">Date: ________ &nbsp; Period: ____</div></header>
+  <p class="dir">Write each answer with the correct number of significant figures. Show your work in the space provided.</p>
+  <div class="q"><h2>1. How many significant figures does each number have?</h2>${items(S.g1,"1")}</div>
+  <div class="q"><h2>2. Multiply. Round your answer to the correct number of significant figures.</h2>${calcs(S.g2,"2")}</div>
+  <div class="q"><h2>3. Divide. Round your answer to the correct number of significant figures.</h2>${calcs(S.g3,"3")}</div>
+  <div class="q"><h2>4. How many significant figures does each number have?</h2>${items(S.g4,"4","two")}</div>
+  <div class="q"><h2>5. Multiply. Round to the correct number of significant figures.</h2>${calcs(S.g5,"5")}</div>
+  <div class="q"><h2>6. Divide. Round to the correct number of significant figures.</h2>${calcs(S.g6,"6")}</div>
+  <div class="q chal"><h2>7. Challenge: Density of ${S.ch.metal}</h2>
+    <div>Solid ${S.ch.metal} has a ${S.ch.type} cubic unit cell with ${S.ch.n} atoms per cell. Its molar mass is given below.</div>
+    <div style="text-align:center">density = <span class="frac"><span>${S.ch.top}</span><span>${S.ch.bot}</span></span></div>
+    <div class="work" style="height:.75in"></div>
+    <div>Answer with units: <span class="ans" style="min-width:200px"></span></div>
+    <p class="note">Units: g/mol divided by mol<sup>\u22121</sup> leaves grams, and the cubed length leaves cm<sup>3</sup>, so the result is g/cm<sup>3</sup>. Why it matters: materials scientists use X-ray measurements of a unit cell's edge length, plus Avogadro's number, to predict a metal's density from its atomic structure.</p>
+  </div></section>`;
+}
+function keyPage(S){
+  const row=(lab,l)=>l.map((x,i)=>`${lab}${"abc"[i]}: <b>${x.a}</b>`).join(" &nbsp;&nbsp; ");
+  return`<section class="key"><h1>Answer Key: ${esc(S.name)}</h1>
+  <p class="keyrow">${row("1",S.g1)}</p><p class="keyrow">${row("2",S.g2)}</p><p class="keyrow">${row("3",S.g3)}</p>
+  <p class="keyrow">${row("4",S.g4)}</p><p class="keyrow">${row("5",S.g5)}</p><p class="keyrow">${row("6",S.g6)}</p>
+  <p class="keyrow">7: <b>${S.ch.ans}</b></p></section>`;
+}
+
+$("gen").onclick=()=>{
+  const names=$("names").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  const out=$("out");
+  if(!names.length){out.innerHTML='<p style="text-align:center">Enter at least one student name above.</p>';return}
+  const seed=$("seed").value||1,data=names.map((n,i)=>build(n,i,seed));
+  out.innerHTML=data.map(sheet).join("")+($("key").checked?data.map(keyPage).join(""):"");
+  out.scrollIntoView({behavior:"smooth"});
+};
+$("print").onclick=()=>window.print();
+</script>
+</body>
+</html>
