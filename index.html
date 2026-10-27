@@ -23,6 +23,7 @@ button{font:inherit;font-weight:600;padding:9px 16px;border-radius:6px;border:1p
 button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #f2a900;outline-offset:2px}
 #out{padding:12px 20px 40px}
 .sheet,.key{background:#fff;width:8.5in;max-width:100%;min-height:10.4in;margin:0 auto 20px;padding:.55in .65in;border:1px solid var(--line);font-family:Georgia,"Times New Roman",serif;font-size:12.5pt;color:#000}
+.sheet{display:flex;flex-direction:column}
 .sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px;gap:12px;flex-wrap:wrap}
 .sheet h1,.key h1{font-size:17pt;margin:0}
 .nm{font-size:15pt}
@@ -34,6 +35,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
 .items.two{grid-template-columns:repeat(2,1fr)}
 .it{display:flex;gap:6px;align-items:baseline}
 .ans{display:inline-block;border-bottom:1px solid #000;min-width:70px;margin-left:4px}
+.cl{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;min-height:.38in}
+.cl .ans{min-width:110px}
+.items.one{grid-template-columns:1fr}
+.opts{display:grid;gap:8px;margin-top:12px}
+.opts label{font-weight:500;margin:0}
+.flip{margin-top:auto;transform:rotate(180deg);font-size:8.5pt;line-height:1.35;border-bottom:1px dashed #777;padding-bottom:4px;font-family:"Segoe UI",system-ui,sans-serif}
+.key h1{margin-bottom:12px}
 .work{height:.45in}
 .chal{border:1.5px solid #000;padding:8px 12px;margin-top:6px}
 .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:4px 0}
@@ -49,6 +57,7 @@ sup{font-size:.7em;line-height:0}
   .controls{display:none}
   #out{padding:0}
   .sheet,.key{border:0;margin:0;padding:.15in .25in;width:auto;min-height:0;page-break-after:always;break-after:page}
+  .sheet{font-size:11pt;min-height:10.1in}
   .sheet:last-child,.key:last-child{page-break-after:auto}
 }
 </style>
@@ -56,13 +65,19 @@ sup{font-size:.7em;line-height:0}
 <body>
 <div class="controls">
   <h1>Significant Figures Worksheet Generator</h1>
-  <p>Enter one student name per line. Each student gets their own worksheet; problems 1–3 are shared, and problems 4–7 differ by student.</p>
+  <p>Enter one student name per line. Problems 1–3 are the same for everyone; problems 4–13 differ by student. Print double-sided, flipping on the long edge.</p>
   <div class="panel">
     <label for="names">Student names</label>
     <textarea id="names" placeholder="Ava Johnson&#10;Marcus Lee&#10;Priya Patel"></textarea>
     <div class="row">
       <span><label for="seed" style="display:inline">Version number</label> <input type="number" id="seed" value="1" min="1"></span>
-      <label><input type="checkbox" id="key" checked> Include answer key pages</label>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="back" checked> Back page: mixed practice (problems 8&ndash;13)</label>
+      <label><input type="checkbox" id="fact" checked> Add an interesting fact about the element in problem 7</label>
+      <label><input type="checkbox" id="flip"> Print answers upside down at the bottom of the opposite page</label>
+      <label><input type="checkbox" id="skey"> Student answer key pages (one page per student, to hand out)</label>
+      <label><input type="checkbox" id="tkey" checked> Teacher answer key (every student on successive pages, with names)</label>
     </div>
     <div class="row">
       <button class="primary" id="gen">Generate worksheets</button>
@@ -92,7 +107,7 @@ function digits(r,sf,tz){
 function plain(r,sf,o={}){
   const s=digits(r,sf,o.tz);let str;
   if(o.lead){str="0."+"0".repeat(o.lead)+s}
-  else{const p=ri(r,1,sf-1);str=s.slice(0,p)+"."+s.slice(p)}
+  else{const p=o.pos||ri(r,1,sf-1);str=s.slice(0,p)+"."+s.slice(p)}
   return{h:str,v:parseFloat(str),sf};
 }
 function sci(r,sf,tz){
@@ -104,82 +119,130 @@ function fmt(v,sf){
   if(/e/.test(s)){const[m,e]=s.split("e");return`${m} \u00d7 10<sup>${neg(+e)}</sup>`}
   return s;
 }
-const N=(h,v,sf)=>({h,v,sf});
-
-const count=(n)=>({q:n.h,a:n.sf});
-const calc=(a,b,op)=>{
-  const sf=Math.min(a.sf,b.sf),v=op==="\u00d7"?a.v*b.v:a.v/b.v;
-  return{q:`${a.h} ${op} ${b.h} =`,a:fmt(v,sf)+` (${sf} s.f.)`};
-};
-const twoSF=(r)=>{const a=ri(r,2,4);let b;do{b=ri(r,2,4)}while(b===a);return[a,b]};
-
 const METALS=[
- ["tungsten",183.84,2,"body-centered",3.165],["iron",55.845,2,"body-centered",2.866],
- ["chromium",51.996,2,"body-centered",2.910],["molybdenum",95.95,2,"body-centered",3.147],
- ["copper",63.546,4,"face-centered",3.615],["aluminum",26.982,4,"face-centered",4.050],
- ["silver",107.87,4,"face-centered",4.086],["gold",196.97,4,"face-centered",4.078],
- ["nickel",58.693,4,"face-centered",3.524]
+ ["tungsten",183.84,2,"body-centered",3.165,"Tungsten has the highest melting point of any metal, 3,422 \u00b0C, which is why light-bulb filaments were made from it. Its symbol, W, comes from its old name, wolfram."],
+ ["iron",55.845,2,"body-centered",2.866,"Earth\u2019s core is mostly iron, and every red blood cell uses iron in hemoglobin to carry oxygen through your body."],
+ ["chromium",51.996,2,"body-centered",2.910,"Chromium is named for the Greek word for color. A trace of it is what makes rubies red and emeralds green."],
+ ["molybdenum",95.95,2,"body-centered",3.147,"For centuries molybdenum was mistaken for lead, and its name means \u201clead-like\u201d in Greek. Today it is added to steel to keep it strong at high temperatures."],
+ ["copper",63.546,4,"face-centered",3.615,"The Statue of Liberty\u2019s outer skin is copper only about 2.4 mm thick. It turned green as the copper slowly reacted with air and moisture."],
+ ["aluminum",26.982,4,"face-centered",4.050,"In the 1800s aluminum was harder to produce than gold. The tip of the Washington Monument is an aluminum pyramid, placed there in 1884 as a sign of wealth."],
+ ["silver",107.87,4,"face-centered",4.086,"Silver conducts electricity better than any other metal, but most wires are copper because it costs far less."],
+ ["gold",196.97,4,"face-centered",4.078,"One gram of gold can be hammered into a sheet about one square meter in area, thin enough to let light shine through."],
+ ["nickel",58.693,4,"face-centered",3.524,"The U.S. five-cent coin is called a nickel, but it is only 25% nickel. The other 75% is copper."]
 ];
+const N=(h,v,sf)=>({h,v,sf});
+const cnt=n=>({q:n.h,a:n.sf,c:1});
+const calc=(a,b,op,u="",w)=>{const sf=Math.min(a.sf,b.sf),v=op==="×"?a.v*b.v:a.v/b.v,p=x=>w?`(${x})`:x;
+  return{q:`${p(a.h)} ${op} ${p(b.h)} =`,a:fmt(v,sf)+u,s:`${sf} s.f.`}};
+const twoSF=r=>{const a=ri(r,2,4);let b;do{b=ri(r,2,4)}while(b===a);return[a,b]};
+const shuf=(r,a)=>a.map(x=>[r(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
+const sfOf=s=>s.replace(".","").replace(/^0+/,"").length;
+const PLACE=["","tenths","hundredths","thousandths"];
+// decimal operand with exactly dp decimal places, stored as an integer to avoid rounding ties
+function dec(r,dp){const w=ri(r,1,99);let f="";for(let i=0;i<dp;i++)f+=ri(r,0,9);return{h:w+"."+f,int:parseInt(w+f),dp}}
+function addsub(r,dps,sg){
+  for(;;){
+    const ops=dps.map(d=>dec(r,d)),mx=Math.max(...dps),mn=Math.min(...dps),P=Math.pow(10,mx-mn);
+    const tot=ops.reduce((t,o,i)=>t+sg[i]*o.int*Math.pow(10,mx-o.dp),0);
+    if(tot<5*Math.pow(10,mx))continue;
+    if(P>1&&tot%P===P/2)continue; // skip exact rounding ties
+    return{ops,mn,str:(Math.round(tot/P)/Math.pow(10,mn)).toFixed(mn)};
+  }
+}
+const expr=(A,sg)=>A.ops.map((o,i)=>(i?(sg[i]>0?" + ":" − "):"")+o.h).join("");
+const asItem=(A,sg)=>({q:expr(A,sg)+" =",a:A.str,s:"round to the "+PLACE[A.mn]+" place"});
 
 function build(name,idx,seed){
   const r=rng(hash(name+"|"+idx+"|"+seed));
   const S={name};
-  // Shared problems (same for every student)
-  S.g1=[count(N("3.14",3.14,3)),count(N("0.0845",.0845,3)),count(N("2.130 \u00d7 10<sup>3</sup>",2130,4))];
-  S.g2=[calc(N("4.56",4.56,3),N("1.4",1.4,2),"\u00d7"),calc(N("12.5",12.5,3),N("0.032",.032,2),"\u00d7")];
-  S.g3=[calc(N("8.40",8.4,3),N("2.1",2.1,2),"\u00f7"),calc(N("15.75",15.75,4),N("0.250",.25,3),"\u00f7")];
-  // Individual problems
-  S.g4=[count(plain(r,ri(r,2,3),{lead:ri(r,1,3)})),count(sci(r,ri(r,3,4),true))];
+  const g1=[cnt(N("3.14",3.14,3)),cnt(N("0.0845",.0845,3)),cnt(N("2.130 × 10<sup>3</sup>",2130,4))];
+  const g2=[calc(N("4.56",4.56,3),N("1.4",1.4,2),"×"),calc(N("12.5",12.5,3),N("0.032",.032,2),"×")];
+  const g3=[calc(N("8.40",8.4,3),N("2.1",2.1,2),"÷"),calc(N("15.75",15.75,4),N("0.250",.25,3),"÷")];
+  const g4=[cnt(plain(r,ri(r,2,3),{lead:ri(r,1,3)})),cnt(sci(r,ri(r,3,4),true))];
   let[x1,y1]=twoSF(r),[x2,y2]=twoSF(r);
-  S.g5=[calc(plain(r,x1),plain(r,y1),"\u00d7"),calc(plain(r,x2,{lead:1}),plain(r,y2),"\u00d7")];
+  const g5=[calc(plain(r,x1),plain(r,y1),"×"),calc(plain(r,x2,{lead:1}),plain(r,y2),"×")];
   [x1,y1]=twoSF(r);[x2,y2]=twoSF(r);
-  S.g6=[calc(plain(r,x1+0),plain(r,y1),"\u00f7"),calc(plain(r,x2),plain(r,y2,{lead:1}),"\u00f7")];
-  // Challenge: density from unit cell
+  const g6=[calc(plain(r,x1),plain(r,y1),"÷"),calc(plain(r,x2),plain(r,y2,{lead:1}),"÷")];
+  S.front=[[1,g1],[2,g2],[3,g3],[4,g4],[5,g5],[6,g6]];
+  // Problem 7: density from unit cell
   const m=pick(r,METALS),Msf=ri(r,3,4),M=parseFloat(m[1].toPrecision(Msf)),a=parseFloat(m[4].toPrecision(3));
-  const n=m[2],nTxt=n.toFixed(1),NA=6.02e23;
-  const v=(n*M)/(NA*Math.pow(a*1e-8,3));
-  S.ch={metal:m[0],type:m[3],n:n,
-    top:`${nTxt} \u00d7 ${M} g/mol`,
-    bot:`(6.02 \u00d7 10<sup>23</sup> mol<sup>\u22121</sup>)(${a} \u00d7 10<sup>\u22128</sup> cm)<sup>3</sup>`,
-    ans:fmt(v,2)+" g/cm\u00b3 (2 s.f., limited by the atom count)"};
+  const n=m[2],v=(n*M)/(6.02e23*Math.pow(a*1e-8,3));
+  S.ch={metal:m[0],type:m[3],n,fact:m[5],
+    top:`${n.toFixed(1)} × ${M} g/mol`,
+    bot:`(6.02 × 10<sup>23</sup> mol<sup>−1</sup>)(${a} × 10<sup>−8</sup> cm)<sup>3</sup>`,
+    a:fmt(v,2)+" g/cm³",s:"2 s.f., limited by the atom count"};
+  // Back page: mixed practice
+  const t4=""+ri(r,1,9)+"0"+ri(r,1,9)+ri(r,1,9);
+  const g8=[cnt(N(digits(r,2)+"0".repeat(ri(r,1,2)),0,2)),cnt(N(t4.slice(0,2)+"."+t4.slice(2),0,4)),cnt(sci(r,2,true)),cnt(plain(r,ri(r,3,4),{lead:ri(r,1,2),tz:true}))];
+  const rd=(o,t)=>({q:`${o.h} → ${t} s.f.`,a:fmt(o.v,t),c:1});
+  const n5=parseInt(digits(r,5));
+  const g9=[rd(plain(r,6,{pos:ri(r,2,3)}),ri(r,3,4)),rd(plain(r,6,{lead:ri(r,1,2)}),2),rd({h:n5.toLocaleString("en-US"),v:n5},2)];
+  const A1=addsub(r,shuf(r,[1,2,3]),[1,1,1]),A2=addsub(r,shuf(r,[1,2,3]).slice(0,2),[1,-1]),A3=addsub(r,shuf(r,[1,2,3]).slice(0,2),[1,-1]);
+  const g10=[asItem(A1,[1,1,1]),asItem(A2,[1,-1]),asItem(A3,[1,-1])];
+  [x1,y1]=twoSF(r);[x2,y2]=twoSF(r);
+  const g11=[calc(sci(r,x1),sci(r,y1),"×","",1),calc(sci(r,x2),sci(r,y2),"÷","",1)];
+  const B1=addsub(r,shuf(r,[1,2,3]).slice(0,2),[1,1]),c1=plain(r,ri(r,2,3),{pos:1}),sf1=Math.min(sfOf(B1.str),c1.sf);
+  const B2=addsub(r,shuf(r,[1,2,3]).slice(0,2),[1,-1]),c2=plain(r,ri(r,2,3),{pos:1}),sf2=Math.min(sfOf(B2.str),c2.sf);
+  const g12=[{q:`(${B1.ops[0].h} + ${B1.ops[1].h}) × ${c1.h} =`,a:fmt(parseFloat(B1.str)*c1.v,sf1),s:`sum rounds to ${B1.str}; ${sf1} s.f.`},
+             {q:`(${B2.ops[0].h} − ${B2.ops[1].h}) ÷ ${c2.h} =`,a:fmt(parseFloat(B2.str)/c2.v,sf2),s:`difference rounds to ${B2.str}; ${sf2} s.f.`}];
+  const Lb=plain(r,ri(r,3,4),{pos:1}),Wd=plain(r,2,{lead:1}),mm=plain(r,ri(r,3,4),{pos:2}),Vv=plain(r,2,{pos:1});
+  const g13=[{q:`A rectangular lab bench is ${Lb.h} m long and ${Wd.h} m wide. What is its area in m²?`,a:fmt(Lb.v*Wd.v,Math.min(Lb.sf,Wd.sf))+" m²",s:`${Math.min(Lb.sf,Wd.sf)} s.f.`},
+             {q:`A metal sample has a mass of ${mm.h} g and a volume of ${Vv.h} mL. What is its density in g/mL?`,a:fmt(mm.v/Vv.v,Math.min(mm.sf,Vv.sf))+" g/mL",s:`${Math.min(mm.sf,Vv.sf)} s.f.`}];
+  S.back=[[8,g8],[9,g9],[10,g10],[11,g11],[12,g12],[13,g13]];
   return S;
 }
 
-const items=(list,start,cls="")=>`<div class="items ${cls}">${list.map((x,i)=>`<div class="it"><span>${start}${"abc"[i]}.</span><span>${x.q}</span>${typeof x.a==="number"?'<span class="ans"></span>':""}</div>`).join("")}</div>`;
-const calcs=(list,start)=>`<div class="items two">${list.map((x,i)=>`<div><div class="it"><span>${start}${"abc"[i]}.</span><span>${x.q}</span></div><div class="work"></div><div>Answer: <span class="ans" style="min-width:120px"></span></div></div>`).join("")}</div>`;
+const lab=(n,i,len)=>n+(len>1?"abcd"[i]:"");
+const hdr=(S,t)=>`<header><div><h1>${t}</h1><div class="nm">Name: <b>${esc(S.name)}</b></div></div><div class="meta">Date: ________ &nbsp; Period: ____</div></header>`;
+const blk=(n,t,list,cls="")=>`<div class="q"><h2>${n}. ${t}</h2><div class="items ${cls}">${list.map((x,i)=>`<div class="${x.c?"it":"cl"}"><span>${"abcd"[i]}.</span><span>${x.q}</span><span class="ans"></span></div>`).join("")}</div></div>`;
+const flipHtml=(groups,label)=>`<div class="flip"><b>${label}:</b> ${groups.map(([n,l])=>l.map((x,i)=>`${lab(n,i,l.length)} ${x.a}`).join(", ")).join("; ")}</div>`;
+const front=S=>[...S.front,[7,[S.ch]]];
 
-function sheet(S){
-  return`<section class="sheet">
-  <header><div><h1>Significant Figures</h1><div class="nm">Name: <b>${esc(S.name)}</b></div></div><div class="meta">Date: ________ &nbsp; Period: ____</div></header>
-  <p class="dir">Write each answer with the correct number of significant figures. Show your work in the space provided.</p>
-  <div class="q"><h2>1. How many significant figures does each number have?</h2>${items(S.g1,"1")}</div>
-  <div class="q"><h2>2. Multiply. Round your answer to the correct number of significant figures.</h2>${calcs(S.g2,"2")}</div>
-  <div class="q"><h2>3. Divide. Round your answer to the correct number of significant figures.</h2>${calcs(S.g3,"3")}</div>
-  <div class="q"><h2>4. How many significant figures does each number have?</h2>${items(S.g4,"4","two")}</div>
-  <div class="q"><h2>5. Multiply. Round to the correct number of significant figures.</h2>${calcs(S.g5,"5")}</div>
-  <div class="q"><h2>6. Divide. Round to the correct number of significant figures.</h2>${calcs(S.g6,"6")}</div>
+function page1(S,o){
+  const f=S.front;
+  return`<section class="sheet">${hdr(S,"Significant Figures")}
+  <p class="dir">Write each answer with the correct number of significant figures. Use the space around each problem for your work.</p>
+  ${blk(1,"How many significant figures does each number have?",f[0][1])}
+  ${blk(2,"Multiply. Round to the correct number of significant figures.",f[1][1],"two")}
+  ${blk(3,"Divide. Round to the correct number of significant figures.",f[2][1],"two")}
+  ${blk(4,"How many significant figures does each number have?",f[3][1],"two")}
+  ${blk(5,"Multiply. Round to the correct number of significant figures.",f[4][1],"two")}
+  ${blk(6,"Divide. Round to the correct number of significant figures.",f[5][1],"two")}
   <div class="q chal"><h2>7. Challenge: Density of ${S.ch.metal}</h2>
-    <div>Solid ${S.ch.metal} has a ${S.ch.type} cubic unit cell with ${S.ch.n} atoms per cell. Its molar mass is given below.</div>
+    <div>Solid ${S.ch.metal} has a ${S.ch.type} cubic unit cell with ${S.ch.n} atoms per cell.</div>
     <div style="text-align:center">density = <span class="frac"><span>${S.ch.top}</span><span>${S.ch.bot}</span></span></div>
-    <div class="work" style="height:.75in"></div>
+    <div class="work" style="height:.6in"></div>
     <div>Answer with units: <span class="ans" style="min-width:200px"></span></div>
-    <p class="note">Units: g/mol divided by mol<sup>\u22121</sup> leaves grams, and the cubed length leaves cm<sup>3</sup>, so the result is g/cm<sup>3</sup>. Why it matters: materials scientists use X-ray measurements of a unit cell's edge length, plus Avogadro's number, to predict a metal's density from its atomic structure.</p>
-  </div></section>`;
+    <p class="note">Units: g/mol divided by mol<sup>−1</sup> leaves grams, and the cubed length leaves cm<sup>3</sup>, so the result is g/cm<sup>3</sup>. Why it matters: materials scientists use X-ray measurements of a unit cell's edge length, plus Avogadro's number, to predict a metal's density from its atomic structure.</p>
+    ${o.fact?`<p class="note"><b>About ${S.ch.metal}:</b> ${S.ch.fact}</p>`:""}
+  </div>
+  ${o.flip?(o.back?flipHtml(S.back,"Answers to page 2"):flipHtml(front(S),"Answers")):""}</section>`;
 }
-function keyPage(S){
-  const row=(lab,l)=>l.map((x,i)=>`${lab}${"abc"[i]}: <b>${x.a}</b>`).join(" &nbsp;&nbsp; ");
-  return`<section class="key"><h1>Answer Key: ${esc(S.name)}</h1>
-  <p class="keyrow">${row("1",S.g1)}</p><p class="keyrow">${row("2",S.g2)}</p><p class="keyrow">${row("3",S.g3)}</p>
-  <p class="keyrow">${row("4",S.g4)}</p><p class="keyrow">${row("5",S.g5)}</p><p class="keyrow">${row("6",S.g6)}</p>
-  <p class="keyrow">7: <b>${S.ch.ans}</b></p></section>`;
+function page2(S,o){
+  const b=S.back;
+  return`<section class="sheet">${hdr(S,"Significant Figures: Mixed Practice")}
+  <p class="dir">Same rules, more variety. Report each answer with the correct number of significant figures or decimal places.</p>
+  ${blk(8,"How many significant figures does each number have? (With no decimal point, trailing zeros do not count.)",b[0][1],"two")}
+  ${blk(9,"Round each number to the given number of significant figures. (Write c in scientific notation.)",b[1][1],"two")}
+  ${blk(10,"Add or subtract. Round to the correct decimal place.",b[2][1],"two")}
+  ${blk(11,"Multiply or divide. Give your answer in scientific notation.",b[3][1],"two")}
+  ${blk(12,"Multi-step. Round the sum or difference first, then finish the problem.",b[4][1],"two")}
+  ${blk(13,"Word problems. Include units.",b[5][1],"one")}
+  ${o.flip?flipHtml(front(S),"Answers to page 1"):""}</section>`;
+}
+function keyPage(S,title,withBack){
+  const g=[...front(S),...(withBack?S.back:[])];
+  return`<section class="key"><h1>${title}: ${esc(S.name)}</h1>${g.map(([n,l])=>`<p class="keyrow">${l.map((x,i)=>`${lab(n,i,l.length)}: <b>${x.a}</b>${x.s?` <small>(${x.s})</small>`:""}`).join(" &nbsp;·&nbsp; ")}</p>`).join("")}</section>`;
 }
 
 $("gen").onclick=()=>{
-  const names=$("names").value.split("\n").map(s=>s.trim()).filter(Boolean);
-  const out=$("out");
+  const names=$("names").value.split("\n").map(s=>s.trim()).filter(Boolean),out=$("out");
   if(!names.length){out.innerHTML='<p style="text-align:center">Enter at least one student name above.</p>';return}
+  const o={back:$("back").checked,fact:$("fact").checked,flip:$("flip").checked};
   const seed=$("seed").value||1,data=names.map((n,i)=>build(n,i,seed));
-  out.innerHTML=data.map(sheet).join("")+($("key").checked?data.map(keyPage).join(""):"");
+  out.innerHTML=data.map(S=>page1(S,o)+(o.back?page2(S,o):"")).join("")
+    +($("skey").checked?data.map(S=>keyPage(S,"Answer Key",o.back)).join(""):"")
+    +($("tkey").checked?data.map(S=>keyPage(S,"Teacher Key",o.back)).join(""):"");
   out.scrollIntoView({behavior:"smooth"});
 };
 $("print").onclick=()=>window.print();
